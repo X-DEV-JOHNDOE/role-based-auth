@@ -11,8 +11,8 @@ Sure, I'll add a section to explain the flow of authentication in your README fi
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/jwt-auth-express.git
-   cd jwt-auth-express
+   git clone https://github.com/X-DEV-JOHNDOE/role-based-auth.git
+   cd role-based-auth
    ```
 
 2. Install the dependencies:
