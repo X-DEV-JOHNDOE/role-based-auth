@@ -79,109 +79,163 @@ app.use(passport.initialize());
 
 
 // first implementation - logic separated in different middlewares ~~~~~~~~~~~~~~~~~~~
-const authenticateJWT = (req, res, next) => {
-  passport.authenticate('jwt', { session: false }, (err, user) => {
-    if (err || !user) {
-      console.log(err);
-      console.log(user);
-      req.isAuthenticated = false;
-    } else {
-      req.isAuthenticated = true;
-      req.user = user; // id, role
-    }
-    next();
-  })(req, res, next);
-};
+// const authenticateJWT = (req, res, next) => {
+//   passport.authenticate('jwt', { session: false }, (err, user) => {
+//     if (err || !user) {
+//       console.log(err);
+//       console.log(user);
+//       req.isAuthenticated = false;
+//     } else {
+//       req.isAuthenticated = true;
+//       req.user = user; // id, role
+//     }
+//     next();
+//   })(req, res, next);
+// };
 
-const handleNewAccessToken = async (req, res, next) => {
-  if (!req.isAuthenticated) {
-    // access token is not valid or user not found
-    const refreshToken = req.cookies?.['refresh-token'];
-    if (!refreshToken) {
-      // in this case, redirect to login or home page 
-      return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
-    }
-    // Verify refresh token
-    jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
-      if (err) {
-        // in this case, redirect to login or home page 
-        return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
-      } else {
-         // Refresh token is valid, issue a new access token
-        const role =  admins.some(u => u.id === decoded.sub) ? "admin" : "user";
-        const newAccessToken = jwt.sign(
-          { 
-            sub: decoded.sub,
-            iat: Math.floor(Date.now() / 1000),
-            role: role
-          },
-          process.env.ACCESS_TOKEN_SECRET,
-          { expiresIn: '15m' }
-        );
-        req.user = { id: decoded.sub, role: role }; // id, role
-        res.locals.newAccessToken = newAccessToken;
-      }
-    });
-  }
-  next();
-};
+// const handleNewAccessToken = (req, res, next) => {
+//   if (!req.isAuthenticated) {
+//     // access token is not valid or user not found
+//     const refreshToken = req.cookies?.['refresh-token'];
+//     if (!refreshToken) {
+//       // in this case, redirect to login or home page 
+//       return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
+//     }
+//     // Verify refresh token
+//     jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+//       if (err) {
+//         // in this case, redirect to login or home page 
+//         return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
+//       } else {
+//          // Refresh token is valid, issue a new access token
+//         const role =  admins.some(u => u.id === decoded.sub) ? "admin" : "user";
+//         const newAccessToken = jwt.sign(
+//           { 
+//             sub: decoded.sub,
+//             iat: Math.floor(Date.now() / 1000),
+//             role: role
+//           },
+//           process.env.ACCESS_TOKEN_SECRET,
+//           { expiresIn: '15m' }
+//         );
+//         req.user = { id: decoded.sub, role: role }; // id, role
+//         res.locals.newAccessToken = newAccessToken;
+//       }
+//     });
+//   }
+//   next();
+// };
 
-const verifyRoles = (...allowedRoles) =>{
-  return (req, res, next) =>{
-    if(!req.user?.role) return res.sendStatus(401);
-    const result = allowedRoles.some(role => role === req.user.role);
-    if(!result) return res.sendStatus(401);
-    else if(res.locals.newAccessToken) return res.status(200).json({ accessToken: res.locals.newAccessToken });
-    next();
-  }
-}
+// const verifyRoles = (...allowedRoles) =>{
+//   return (req, res, next) =>{
+//     if(!req.user?.role) return res.sendStatus(401);
+//     if(!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+//     else if(res.locals.newAccessToken) return res.status(200).json({ accessToken: res.locals.newAccessToken });
+//     next();
+//   }
+// }
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
 // second implementation - entire logic in one middleware ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// const authenticate = (...allowedRoles) =>{
-//   return (req, res, next)=>{
-//     passport.authenticate('jwt', {session: false}, (err, user)=>{
+// const jwtVerify = (token, secret) => {
+//   return new Promise((resolve, reject) => {
+//     jwt.verify(token, secret, (err, decoded) => {
+//       if (err) {
+//         reject(err);
+//       } else {
+//         resolve(decoded);
+//       }
+//     });
+//   });
+// };
+
+// const authenticate = (...allowedRoles) => {
+//   return (req, res, next) => {
+//     passport.authenticate('jwt', { session: false }, async (err, user) => {
 //       if (err || !user) {
 //         console.log(err);
-//         console.log(!user);
-//         // access token is not valid or user not found
+//         console.log(user);
+//         // Access token is not valid or user not found
 //         const refreshToken = req.cookies?.['refresh-token'];
 //         if (!refreshToken) {
-//           // in this case, redirect to login or home page
+//           // No refresh token provided
+//           // in this case, redirect to login or home page 
 //           return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
 //         }
-//         // Verify refresh token
-//         jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, async (err, decoded) => {
-//           if (err) {
-//             // in this case, redirect to login or home page
-//             return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
-//           } else {
-//             // Refresh token is valid, issue a new access token
-//             const role =  admins.some(u => u.id === decoded.sub) ? "admin" : "user";
-//             const newAccessToken = jwt.sign(
-//               { 
-//                 sub: decoded.sub,
-//                 iat: Math.floor(Date.now() / 1000),
-//                 role: role
-//               },
-//               process.env.ACCESS_TOKEN_SECRET,
-//               { expiresIn: '15m' }
-//             );
-//             req.user = { id: decoded.sub, role: role }; // id, role
-//             const isValid = allowedRoles.some(role => role === req.user.role);
-//             if(!isValid) return res.sendStatus(401);
-//             return res.status(200).json({ accessToken: newAccessToken });
-//           }
-//         });
+//         try {
+//           const decoded = await jwtVerify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+//           const role = admins.some(u => u.id === decoded.sub) ? "admin" : "user";
+//           const newAccessToken = jwt.sign(
+//             { 
+//               sub: decoded.sub,
+//               iat: Math.floor(Date.now() / 1000),
+//               role: role
+//             },
+//             process.env.ACCESS_TOKEN_SECRET,
+//             { expiresIn: '15m' }
+//           );
+//           req.user = { id: decoded.sub, role: role }; // id, role
+//           if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+//           return res.status(200).json({ accessToken: newAccessToken });
+//         } catch (err) {
+//           // Invalid refresh token 
+//           // in this case, redirect to login or home page 
+//           return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
+//         }
 //       }
-//       req.user=user; // id, role
-//       const isValid = allowedRoles.some(role => role === req.user.role);
-//       if(!isValid) return res.sendStatus(401);
+//       req.user = user; // id, role
+//       if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
 //       next();
 //     })(req, res, next);
 //   }
 // }
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// third implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const authenticate = (...allowedRoles) => {
+  return (req, res, next) => {
+    passport.authenticate('jwt', { session: false }, (err, user) => {
+      if (err || !user) {
+        console.log(err);
+        console.log(user);
+        // Access token is not valid or user not found
+        const refreshToken = req.cookies?.['refresh-token'];
+        if (!refreshToken) {
+          // No refresh token provided
+          // in this case, redirect to login or home page 
+          return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
+        }
+        // added return 
+        return jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+          if (err) {
+            // Invalid refresh token 
+            // in this case, redirect to login or home page 
+            return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
+          } else {
+            // Refresh token is valid, issue a new access token
+            const role = admins.some(u => u.id === decoded.sub) ? "admin" : "user";
+            const newAccessToken = jwt.sign(
+              { 
+                sub: decoded.sub,
+                iat: Math.floor(Date.now() / 1000),
+                role: role
+              },
+              process.env.ACCESS_TOKEN_SECRET,
+              { expiresIn: '15m' }
+            );
+            req.user = { id: decoded.sub, role: role }; // id, role
+            if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+            return res.status(200).json({ accessToken: newAccessToken });
+          }
+        });
+      }
+      req.user = user; // id, role
+      if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+      next();
+    })(req, res, next);
+  }
+}
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -306,27 +360,27 @@ app.get('/api/v1/logout', async (req, res)=>{
 
 
 // first implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-app.use(authenticateJWT);
-app.use(handleNewAccessToken);
+// app.use(authenticateJWT);
+// app.use(handleNewAccessToken);
 
-app.get('/api/v1/protected/admin/dashboard', verifyRoles("admin") ,async (req, res)=>{
-  return res.status(200).json({ message: "welcome, admin" })
-});
-
-app.get('/api/v1/protected/user/profile', verifyRoles("user"), async (req, res)=>{
-    return res.status(200).json({ message: "welcome, user" })
-});
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-// second implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// app.get('/api/v1/protected/admin/dashboard', authenticate("admin") ,async (req, res)=>{
+// app.get('/api/v1/protected/admin/dashboard', verifyRoles("admin") ,async (req, res)=>{
 //   return res.status(200).json({ message: "welcome, admin" })
 // });
 
-// app.get('/api/v1/protected/user/profile', authenticate("user"), async (req, res)=>{
+// app.get('/api/v1/protected/user/profile', verifyRoles("user"), async (req, res)=>{
 //     return res.status(200).json({ message: "welcome, user" })
 // });
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+// second and third implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+app.get('/api/v1/protected/admin/dashboard', authenticate("admin") ,async (req, res)=>{
+  return res.status(200).json({ message: "welcome, admin" })
+});
+
+app.get('/api/v1/protected/user/profile', authenticate("user"), async (req, res)=>{
+    return res.status(200).json({ message: "welcome, user" })
+});
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
