@@ -6,7 +6,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import passportJWT from "passport-jwt";  
-import cors from 'cors';
+import cors from "cors";
 
 env.config();
 const JwtStrategy = passportJWT.Strategy;
@@ -24,19 +24,21 @@ const admins = [
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-const allowedOrigins = ["http://localhost:3000"];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (allowedOrigins.indexOf(origin) !== -1 || !origin) callback(null, true);
-      else callback(new Error("Origin not allowed by CORS"));
-    },
-    methods: "GET,POST,PUT,DELETE",
-    credentials: true,
-    optionsSuccessStatus: 204,
-  })
-);
+const allowedOrigins = ['http://localhost:3000'];
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
 
 // Database Connection Pooling
 const pool = new pg.Pool({
@@ -105,14 +107,13 @@ app.use(passport.initialize());
 //     jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
 //       if (err) {
 //         // in this case, redirect to login or home page 
-//         return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
+//         return res.status(403).json({ message: 'Forbidden: Invalid refresh token' });
 //       } else {
 //          // Refresh token is valid, issue a new access token
 //         const role =  admins.some(u => u.id === decoded.sub) ? "admin" : "user";
 //         const newAccessToken = jwt.sign(
 //           { 
-//             sub: decoded.sub,
-//             iat: Math.floor(Date.now() / 1000),
+//             sub: decoded.sub,  
 //             role: role
 //           },
 //           process.env.ACCESS_TOKEN_SECRET,
@@ -169,7 +170,6 @@ app.use(passport.initialize());
 //           const newAccessToken = jwt.sign(
 //             { 
 //               sub: decoded.sub,
-//               iat: Math.floor(Date.now() / 1000),
 //               role: role
 //             },
 //             process.env.ACCESS_TOKEN_SECRET,
@@ -178,10 +178,10 @@ app.use(passport.initialize());
 //           req.user = { id: decoded.sub, role: role }; // id, role
 //           if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
 //           return res.status(200).json({ accessToken: newAccessToken });
-//         } catch (err) {
+//         } catch (error) {
 //           // Invalid refresh token 
 //           // in this case, redirect to login or home page 
-//           return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
+//           return res.status(403).json({ message: 'Forbidden: Invalid refresh token' });
 //         }
 //       }
 //       req.user = user; // id, role
@@ -192,52 +192,61 @@ app.use(passport.initialize());
 // }
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+
 // third implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const authenticate = (...allowedRoles) => {
-  return (req, res, next) => {
-    passport.authenticate('jwt', { session: false }, (err, user) => {
-      if (err || !user) {
-        console.log(err);
-        console.log(user);
-        // Access token is not valid or user not found
-        const refreshToken = req.cookies?.['refresh-token'];
-        if (!refreshToken) {
-          // No refresh token provided
-          // in this case, redirect to login or home page 
-          return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
-        }
-        // added return 
-        return jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
-          if (err) {
-            // Invalid refresh token 
-            // in this case, redirect to login or home page 
-            return res.status(403).json({ message: 'Unauthorized: Invalid refresh token' });
-          } else {
-            // Refresh token is valid, issue a new access token
-            const role = admins.some(u => u.id === decoded.sub) ? "admin" : "user";
-            const newAccessToken = jwt.sign(
-              { 
-                sub: decoded.sub,
-                iat: Math.floor(Date.now() / 1000),
-                role: role
-              },
-              process.env.ACCESS_TOKEN_SECRET,
-              { expiresIn: '15m' }
-            );
-            req.user = { id: decoded.sub, role: role }; // id, role
-            if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
-            return res.status(200).json({ accessToken: newAccessToken });
-          }
-        });
-      }
-      req.user = user; // id, role
-      if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
-      next();
-    })(req, res, next);
+// const authenticate = (...allowedRoles) => {
+//   return (req, res, next) => {
+//     passport.authenticate('jwt', { session: false }, (err, user) => {
+//       if (err || !user) {
+//         console.log(err);
+//         console.log(user);
+//         // Access token is not valid or user not found
+//         const refreshToken = req.cookies?.['refresh-token'];
+//         if (!refreshToken) {
+//           // No refresh token provided
+//           // in this case, redirect to login or home page 
+//           return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
+//         }
+//         // added return 
+//         return jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+//           if (err) {
+//             // Invalid refresh token 
+//             // in this case, redirect to login or home page 
+//             return res.status(403).json({ message: 'Forbidden: Invalid refresh token' });
+//           } else {
+//             // Refresh token is valid, issue a new access token
+//             const role = admins.some(u => u.id === decoded.sub) ? "admin" : "user";
+//             if (!allowedRoles.includes(role)) return res.sendStatus(401);
+//             const newAccessToken = jwt.sign(
+//               { 
+//                 sub: decoded.sub,
+//                 role: role
+//               },
+//               process.env.ACCESS_TOKEN_SECRET,
+//               { expiresIn: '15m' }
+//             );
+//             req.user = { id: decoded.sub, role: role }; // id, role
+//             return res.status(200).json({ accessToken: newAccessToken });
+//           }
+//         });
+//       }
+//       req.user = user; // id, role
+//       if (!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+//       next();
+//     })(req, res, next);
+//   }
+// }
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// forth implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const verifyRoles = (...allowedRoles) =>{
+  return (req, res, next) =>{
+    if(!req.user?.role) return res.sendStatus(401);
+    if(!allowedRoles.includes(req.user.role)) return res.sendStatus(401);
+    next();
   }
 }
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 
 
 // Routes
@@ -256,7 +265,6 @@ app.post('/api/v1/login', async (req, res) => {
         const refreshToken = jwt.sign(
           {
             sub: userId,
-            iat: Math.floor(Date.now() / 1000), // in seconds
             role: role
           },
           process.env.REFRESH_TOKEN_SECRET,
@@ -265,7 +273,6 @@ app.post('/api/v1/login', async (req, res) => {
         const accessToken = jwt.sign(
           {
             sub: userId,
-            iat: Math.floor(Date.now() / 1000), // in seconds
             role: role
           },
           process.env.ACCESS_TOKEN_SECRET,
@@ -274,17 +281,18 @@ app.post('/api/v1/login', async (req, res) => {
         res.cookie("refresh-token", refreshToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
+          sameSite: 'Lax',
           maxAge: 3600000, // in milliseconds
         });
         console.log("Login successful");
         return res.status(200).json({ accessToken, role });
       }else{
         // incorrect password
-        return res.status(401).json({ message: 'Incorrect password' });
+        return res.status(401).json({ message: 'Unauthorized: Incorrect password' });
       }
     }else{
       // user not found 
-      return res.status(401).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'Unauthorized: User not found' });
     }
   } catch (error) {
     // backend screwed up
@@ -318,7 +326,6 @@ app.post('/api/v1/register', async (req, res) => {
       const refreshToken = jwt.sign(
         {
           sub: userId,
-          iat: Math.floor(Date.now() / 1000),
           role: role
         },
         process.env.REFRESH_TOKEN_SECRET,
@@ -327,7 +334,6 @@ app.post('/api/v1/register', async (req, res) => {
       const accessToken = jwt.sign(
         {
           sub: userId,
-          iat: Math.floor(Date.now() / 1000),
           role: role
         },
         process.env.ACCESS_TOKEN_SECRET,
@@ -336,6 +342,7 @@ app.post('/api/v1/register', async (req, res) => {
       res.cookie("refresh-token", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
+        sameSite: 'Lax',
         maxAge: 3600000,
       });
       console.log("Registeration successful");
@@ -354,7 +361,7 @@ app.post('/api/v1/register', async (req, res) => {
 
 app.get('/api/v1/logout', async (req, res)=>{
   if(!req.cookies?.["refresh-token"]) return res.sendStatus(204) // No Content
-  res.clearCookie("refresh-token", { httpOnly: true, secure: process.env.NODE_ENV === "production" });
+  res.clearCookie("refresh-token", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: 'Lax'});
   res.status(200).send("successfully, logged out");
 });
 
@@ -374,11 +381,52 @@ app.get('/api/v1/logout', async (req, res)=>{
 
 
 // second and third implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-app.get('/api/v1/protected/admin/dashboard', authenticate("admin") ,async (req, res)=>{
+// app.get('/api/v1/protected/admin/dashboard', authenticate("admin") ,async (req, res)=>{
+//   return res.status(200).json({ message: "welcome, admin" })
+// });
+
+// app.get('/api/v1/protected/user/profile', authenticate("user"), async (req, res)=>{
+//     return res.status(200).json({ message: "welcome, user" })
+// });
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+// forth implementation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+app.get('/api/v1/refresh', async (req, res)=>{
+  // Access token is not valid or user not found
+  const refreshToken = req.cookies?.['refresh-token'];
+  if (!refreshToken) {
+    // No refresh token provided
+    // in this case, redirect to login or home page 
+    return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
+  }
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      // Invalid refresh token 
+      // in this case, redirect to login or home page 
+      return res.status(403).json({ message: 'Forbidden: Invalid refresh token' });
+    } else {
+      // Refresh token is valid, issue a new access token
+      const role = admins.some(u => u.id === decoded.sub) ? "admin" : "user";
+      const newAccessToken = jwt.sign(
+        { 
+          sub: decoded.sub,
+          role: role
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: '15m' }
+      );
+      req.user = { id: decoded.sub, role: role }; // id, role
+      return res.status(200).json({ accessToken: newAccessToken, role: role });
+    }
+  });
+});
+
+app.use(passport.authenticate('jwt', {session: false}));
+app.get('/api/v1/protected/admin/dashboard', verifyRoles("admin") ,async (req, res)=>{
   return res.status(200).json({ message: "welcome, admin" })
 });
 
-app.get('/api/v1/protected/user/profile', authenticate("user"), async (req, res)=>{
+app.get('/api/v1/protected/user/profile', verifyRoles("user"), async (req, res)=>{
     return res.status(200).json({ message: "welcome, user" })
 });
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
