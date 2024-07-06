@@ -2,8 +2,6 @@
 
 This repository demonstrates how to implement JWT authentication with access and refresh token functionality using passport-jwt in an Express.js application.
 
-Sure, I'll add a section to explain the flow of authentication in your README file:
-
 ---
 
 
